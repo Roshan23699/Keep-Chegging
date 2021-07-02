@@ -1,0 +1,11 @@
+Jaunt 1.6.1 (Monthly Edition) Release Notes
+
+Release date: May 28, 2021
+Expiry date: Jun. 30, 2021
+
+Installation Instructions & Quickstart Tutorial:
+http://jaunt-api.com/jaunt-tutorial.htm
+
+CHANGES:
+
+No Changes.
