@@ -5,7 +5,6 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.IBinder;
-import android.preference.PreferenceManager;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -26,13 +25,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
-import java.sql.Time;
-import java.util.Calendar;
 
-import static android.os.SystemClock.sleep;
 import static android.os.SystemClock.uptimeMillis;
 import static com.example.demo.App.CHANNEL_ID;
 import static com.example.demo.App.default_channel;
+import static com.example.demo.MainActivity.PACKAGE_NAME_TEMP;
 import static com.example.demo.SecondActivity.TAG;
 
 public class RequestService extends Service {
@@ -54,7 +51,6 @@ public class RequestService extends Service {
 
                 @Override
                 public void run() {
-
                     String textTitle = "Chegg";
                     String textContent = "Waiting for new questions";
                     NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(getApplicationContext());
@@ -65,140 +61,109 @@ public class RequestService extends Service {
                             .build();
                     startForeground(2, notification);
                     while(true) {
+                        if(!(getRunningStatus(0) || getRunningStatus(1) || getRunningStatus(2)))onDestroy();
+
                         time = uptimeMillis();
-                        if(time - TIME > 7200000)onDestroy();
-                        if(STOP_NOW)break;
-
-                        Log.d(TAG, "run: service running");
-                        try {
-                            RequestQueue requestQueue = Volley.newRequestQueue(RequestService.this);
-                            String URL = "http://3.143.169.217:3000/api/";
-                            JSONObject jsonBody = new JSONObject();
-                            SharedPreferences getShared =   getSharedPreferences("demo", MODE_PRIVATE);
-                            String email, password;
-                            email = getShared.getString("com.example.demo.email", "");
-                            password = getShared.getString("com.example.demo.password", "");
-
-                            jsonBody.put("username", email);
-                            jsonBody.put("password", password);
-                            Log.d(TAG, "onStartCommand: email is " + email + "password is " + password);
-                            final String requestBody = jsonBody.toString();
-
-                            StringRequest stringRequest = new StringRequest(Request.Method.POST, URL, new Response.Listener<String>() {
-                                @Override
-                                public void onResponse(String response) {
-                                    Log.i("VOLLEY", "the response is " + response);
-                                    String textTitle = "", textContent = "";
-                                    NotificationManagerCompat notificationManagerCompat;
-                                    if (response.equals("available")) {
-                                        available = 1;
-                                        Log.d(TAG, "onResponse: Working inside notification now" + " " + available);
-
-                                        textTitle = "New Question";
-                                        textContent = "Got new chegg question 10 mins left...";
-                                        notificationManagerCompat = NotificationManagerCompat.from(getApplicationContext());
-                                        Notification notification = new NotificationCompat.Builder(getApplicationContext(), CHANNEL_ID)
-                                                .setSmallIcon(R.drawable.notification)
-                                                .setContentTitle(textTitle)
-                                                .setContentText(textContent)
-                                                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                                                .setCategory(NotificationCompat.CATEGORY_ALARM)
-                                                .build();
-                                        notificationManagerCompat.notify(1, notification);
-
-                                    }
-                                    else if(response.equals("noquestion")) {
-//                                            textTitle = "Chegg";
-//                                            textContent = "No question yet";
-//                                            notificationManagerCompat = NotificationManagerCompat.from(getApplicationContext());
-//                                            Notification notification = new NotificationCompat.Builder(getApplicationContext(), CHANNEL_ID)
-//                                                    .setSmallIcon(R.drawable.notification)
-//                                                    .setContentTitle(textTitle)
-//                                                    .setContentText(textContent)
-//                                                    .setPriority(NotificationCompat.PRIORITY_LOW)
-//                                                    .build();
-//                                            notificationManagerCompat.notify(1, notification);
-                                            available = 2;
-                                    }
-                                    else {
-//                                        textTitle = "error";
-//                                        textContent = response;
-//                                        notificationManagerCompat = NotificationManagerCompat.from(getApplicationContext());
-//                                        Notification notification = new NotificationCompat.Builder(getApplicationContext(), CHANNEL_ID)
-//                                                .setSmallIcon(R.drawable.notification)
-//                                                .setContentTitle(textTitle)
-//                                                .setContentText(textContent)
-//                                                .setPriority(NotificationCompat.PRIORITY_LOW)
-//                                                .build();
-//                                        notificationManagerCompat.notify(1, notification);
-                                        available = 2;
-                                    }
-
-
-                                }
-                            }, new Response.ErrorListener() {
-                                @Override
-                                public void onErrorResponse(VolleyError error) {
-                                    Log.e("VOLLEY", error.toString());
-//                                    stopSelf();
-                                }
-                            }) {
-                                @Override
-                                public String getBodyContentType() {
-                                    return "application/json; charset=utf-8";
-                                }
-
-                                @Override
-                                public byte[] getBody() throws AuthFailureError {
-                                    try {
-                                        return requestBody == null ? null : requestBody.getBytes("utf-8");
-                                    } catch (UnsupportedEncodingException uee) {
-                                        VolleyLog.wtf("Unsupported Encoding while trying to get the bytes of %s using %s", requestBody, "utf-8");
-//                                        stopSelf();
-                                        return null;
-                                    }
-                                }
-
-//                @Override
-//                protected Response<String> parseNetworkResponse(NetworkResponse response) {
-//                    String responseString = "";
-//                    if (response != null) {
-//                        responseString = String.valueOf(response);
-//                        // can get more details such as response.headers
-//                    }
-//                    return Response.success(responseString, HttpHeaderParser.parseCacheHeaders(response));
-//                }
-
-                            };
-                            stringRequest.setRetryPolicy(new DefaultRetryPolicy(
-                                    MY_SOCKET_TIMEOUT_MS,
-                                    DefaultRetryPolicy.DEFAULT_MAX_RETRIES,
-                                    DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
-
-                            requestQueue.add(stringRequest);
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-//                            stopSelf();
+                        if(time - TIME > 7200000) {
+                            textTitle = "Stopped Checking Questions";
+                            textContent = "Please restart the checking of questions in order to get notified";
+                            notificationManagerCompat = NotificationManagerCompat.from(getApplicationContext());
+                            Notification notification1 = new NotificationCompat.Builder(getApplicationContext(), CHANNEL_ID)
+                                    .setSmallIcon(R.drawable.notification)
+                                    .setContentTitle(textTitle)
+                                    .setContentText(textContent)
+                                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                                    .setCategory(NotificationCompat.CATEGORY_ALARM)
+                                    .build();
+                            notificationManagerCompat.notify(4, notification1);
+                            onDestroy();
                         }
+                        if(STOP_NOW)break;
+                        Log.d(TAG, "run: service running");
+                        for(int i = 0; i < 3; i++) {
+                                if(!getRunningStatus(i))continue;
+                            try {
+                                RequestQueue requestQueue = Volley.newRequestQueue(RequestService.this);
+                                String URL = "http://3.143.169.217:3000/api/";
+                                JSONObject jsonBody = new JSONObject();
+                                SharedPreferences getShared = getSharedPreferences(PACKAGE_NAME_TEMP, MODE_PRIVATE);
+                                String email, password;
+                                email = getShared.getString(PACKAGE_NAME_TEMP+".email"+i, "");
+                                password = getShared.getString(PACKAGE_NAME_TEMP+".password"+i, "");
+                                jsonBody.put("username", email);
+                                jsonBody.put("password", password);
+                                Log.d(TAG, "onStartCommand: email is " + email + "password is " + password);
+                                final String requestBody = jsonBody.toString();
+                                int finalI = i;
+                                StringRequest stringRequest1 = new StringRequest(Request.Method.POST, URL, new Response.Listener<String>() {
+                                    @Override
+                                    public void onResponse(String response) {
+                                        Log.i("VOLLEY", "the response is " + response);
+                                        String textTitle = "", textContent = "";
+                                        NotificationManagerCompat notificationManagerCompat;
+                                        if (response.equals("available")) {
+                                            Log.d(TAG, "onResponse: Working inside notification now" + " " + available);
+                                            textTitle = email;
+                                            textContent = "Got new chegg question 10 mins left...";
+                                            notificationManagerCompat = NotificationManagerCompat.from(getApplicationContext());
+                                            Notification notification = new NotificationCompat.Builder(getApplicationContext(), CHANNEL_ID)
+                                                    .setSmallIcon(R.drawable.notification)
+                                                    .setContentTitle(textTitle)
+                                                    .setContentText(textContent)
+                                                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                                                    .setCategory(NotificationCompat.CATEGORY_ALARM)
+                                                    .build();
+                                            notificationManagerCompat.notify(finalI, notification);
+
+                                        }
+                                    }
+                                }, new Response.ErrorListener() {
+                                    @Override
+                                    public void onErrorResponse(VolleyError error) {
+                                        Log.e("VOLLEY", error.toString());
+//                                    stopSelf();
+                                    }
+                                }) {
+                                    @Override
+                                    public String getBodyContentType() {
+                                        return "application/json; charset=utf-8";
+                                    }
+
+                                    @Override
+                                    public byte[] getBody() throws AuthFailureError {
+                                        try {
+                                            return requestBody == null ? null : requestBody.getBytes("utf-8");
+                                        } catch (UnsupportedEncodingException uee) {
+                                            VolleyLog.wtf("Unsupported Encoding while trying to get the bytes of %s using %s", requestBody, "utf-8");
+//                                        stopSelf();
+                                            return null;
+                                        }
+                                    }
+                                };
+                                stringRequest1.setRetryPolicy(new DefaultRetryPolicy(
+                                        MY_SOCKET_TIMEOUT_MS,
+                                        DefaultRetryPolicy.DEFAULT_MAX_RETRIES,
+                                        DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+
+                                requestQueue.add(stringRequest1);
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+//                            stopSelf();
+                            }
+
+                            //1st request ends here
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+
+
+
+                        //sleep the thread
                         try {
-                            Log.d(TAG, "run: available" + available);
-                            if(available == 3) {
-                                int ii = 0;
-                                while(true) {
-                                    if(ii > 20) break;
-                                    sleep(3000);
-                                    if(available != 3)break;
-                                    ii++;
-                                }
-                            }
-                            if(available == 1) {
-                                Log.d(TAG, "run: inside 10 minute sleep");
-                                Thread.sleep(10 * 60 * 1000);
-                            }
-                            else {
-                                Log.d(TAG, "run: inside 2 minute sleep");
-                                Thread.sleep(2 * 60 * 1000);
-                            }
+                            Thread.sleep(1000 * 60 * 10);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
@@ -223,5 +188,11 @@ public class RequestService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+    private boolean getRunningStatus(int i){
+        //save
+        SharedPreferences accounts = getSharedPreferences(PACKAGE_NAME_TEMP, MODE_PRIVATE);
+        return accounts.getBoolean(PACKAGE_NAME_TEMP+".running" + i, false);
+
     }
 }
